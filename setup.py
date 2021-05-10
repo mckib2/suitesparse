@@ -173,13 +173,62 @@ def configuration(parent_package='', top_path=None):
                                                             ('t_cholmod_transpose', 't_cholmod_l_transpose'),
                                                             ('t_cholmod_triplet', 't_cholmod_l_triplet')])
 
-    # TODO:
-    # Cholesky module
-    # Partition module
-    # MatrixOps module
-    # Modify module
-    # Supernodal module
+    # CHOLMOD/Cholesky module
+    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Cholesky').glob('cholmod_*.c')]
+    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Cholesky').glob('cholmod_*.c')]    
+    shutil.copytree(SS / 'CHOLMOD/Cholesky', tmp / 'CHOLMODL/Cholesky')
+    for f in (tmp / 'CHOLMODL/Cholesky').glob('*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_lsolve.c', 't_cholmod_l_lsolve.c'),
+                                                            ('t_cholmod_ltsolve.c', 't_cholmod_l_ltsolve.c'),
+                                                            ('t_cholmod_rowfac.c', 't_cholmod_l_rowfac.c'),
+                                                            ('t_cholmod_solve.c', 't_cholmod_l_solve.c')])
     
+    # CHOLMOD/Partition module
+    cholmod_includes += [str(SS / 'metis-5.1.0/include'), str(SS / 'CAMD/Include'), str(SS / 'CCOLAMD/Include')]
+    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Partition').glob('cholmod_*.c')]
+    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Partition').glob('cholmod_l_*.c')]    
+    shutil.copytree(SS / 'CHOLMOD/Partition', tmp / 'CHOLMODL/Parititon')
+    for f in (tmp / 'CHOLMODL/Parititon').glob('*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
+
+    # CHOLMOD/MatrixOps module
+    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/MatrixOps').glob('cholmod_*.c')]
+    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/MatrixOps').glob('cholmod_l_*.c')]    
+    shutil.copytree(SS / 'CHOLMOD/MatrixOps', tmp / 'CHOLMODL/MatrixOps')
+    for f in (tmp / 'CHOLMODL/MatrixOps').glob('*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_sdmult.c', 't_cholmod_l_sdmult.c')])
+
+    # CHOLMOD/Modify module
+    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Modify').glob('cholmod_*.c')]
+    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Modify').glob('cholmod_l_*.c')]    
+    shutil.copytree(SS / 'CHOLMOD/Modify', tmp / 'CHOLMODL/Modify')
+    for f in (tmp / 'CHOLMODL/Modify').glob('*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_updown.c', 't_cholmod_l_updown.c'),
+                                                            ('t_cholmod_updown_numkr.c', 't_cholmod_l_updown_numkr.c')])
+
+    # CHOLMOD/Supernodal module
+    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Supernodal').glob('cholmod_*.c')]
+    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Supernodal').glob('cholmod_l_*.c')]    
+    shutil.copytree(SS / 'CHOLMOD/Supernodal', tmp / 'CHOLMODL/Supernodal')
+    for f in (tmp / 'CHOLMODL/Supernodal').glob('*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_super_numeric.c', 't_cholmod_l_super_numeric.c'),
+                                                            ('t_cholmod_super_solve.c', 't_cholmod_l_super_solve.c')])
+
     # CHOLMOD
     config.add_library(
         'cholmod',
