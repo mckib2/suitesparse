@@ -109,8 +109,84 @@ def configuration(parent_package='', top_path=None):
         libraries=['suitesparseconfig'],
         language='c')
 
-    # BTF
+    # CHOLMOD/Check module
+    cholmod_sources = [str(SS / 'CHOLMOD/Check/cholmod_check.c'),
+                       str(SS / 'CHOLMOD/Check/cholmod_read.c'),
+                       str(SS / 'CHOLMOD/Check/cholmod_write.c'),
+                       str(tmp / 'CHOLMODL/Check/cholmod_l_check.c'),
+                       str(tmp / 'CHOLMODL/Check/cholmod_l_read.c'),
+                       str(tmp / 'CHOLMODL/Check/cholmod_l_write.c')]
+    cholmod_includes = [str(SS / 'AMD/Include'),
+                        str(SS / 'AMD/Source'),
+                        str(SS / 'COLAMD/Include'),
+                        str(SS / 'CHOLMOD/Include'),
+                        str(tmp / 'CHOLMODL/Include')]
+    shutil.copytree(SS / 'CHOLMOD/Check', tmp / 'CHOLMODL/Check')
+    shutil.copytree(SS / 'CHOLMOD/Include', tmp / 'CHOLMODL/Include')
+    cholmod_l_hdrs = [(hdr.name, hdr.name.replace('cholmod', 'cholmod_l')) for hdr in (SS / 'CHOLMOD/Include').glob('*.h')]
+    for f in (tmp / 'CHOLMODL/Include').glob('*.h'):
+        fnew = f.parent / f.name.replace('cholmod', 'cholmod_l')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
+
+    for f in (tmp / 'CHOLMODL/Check').glob('cholmod_*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=[('cholmod_internal.h', 'cholmod_l_internal.h'),
+                                           ('cholmod_check.h', 'cholmod_l_check.h'),
+                                           ('cholmod_config.h', 'cholmod_l_config.h'),
+                                           ('cholmod_matrixops.h', 'cholmod_l_matrixops.h')])
+
+    # CHOLMOD/Core module
+    cholmod_sources += [str(SS / 'CHOLMOD/Core/cholmod_common.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_change_factor.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_memory.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_sparse.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_complex.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_band.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_copy.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_error.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_aat.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_add.c'),
+                        str(SS / 'CHOLMOD/Core/cholmod_version.c'),
+                        
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_common.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_change_factor.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_memory.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_sparse.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_complex.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_band.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_copy.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_error.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_aat.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_add.c'),
+                        str(tmp / 'CHOLMODL/Core/cholmod_l_version.c')]
+    shutil.copytree(SS / 'CHOLMOD/Core', tmp / 'CHOLMODL/Core')
+    for f in (tmp / 'CHOLMODL/Core').glob('*.c'):
+        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+        shutil.move(f, fnew)
+        _add_macros(f=fnew, macros=['DLONG'])
+        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_change_factor.c', 't_cholmod_l_change_factor.c'),
+                                                            ('t_cholmod_dense', 't_cholmod_l_dense'),
+                                                            ('t_cholmod_transpose', 't_cholmod_l_transpose'),
+                                                            ('t_cholmod_triplet', 't_cholmod_l_triplet')])
+
+    # TODO:
+    # Cholesky module
+    # Partition module
+    # MatrixOps module
+    # Modify module
+    # Supernodal module
     
+    # CHOLMOD
+    config.add_library(
+        'cholmod',
+        sources=cholmod_sources,
+        include_dirs=[str(SS / 'SuiteSparse_config')] + cholmod_includes,
+        libraries=['amd', 'colamd', 'suitesparseconfig', 'lapack', 'blas'],
+        language='c')    
     
     return config
 
