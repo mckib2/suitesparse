@@ -33,6 +33,7 @@ def _redirect_headers(f: pathlib.Path, headers: List[Tuple[str]]):
 
 def configuration(parent_package='', top_path=None):
     from numpy.distutils.misc_util import Configuration
+    from numpy.distutils.system_info import get_info
     config = Configuration('suitesparse', parent_package, top_path)
 
     # SuiteSparse_config
@@ -49,20 +50,38 @@ def configuration(parent_package='', top_path=None):
     # AMD
     shutil.copytree(SS / 'AMD/Source', tmp / 'AMDI/Source')
     shutil.copytree(SS / 'AMD/Source', tmp / 'AMDL/Source')
-    for type_ in (('DINT', 'i', 'I'), ('DLONG', 'l', 'L')):
+    shutil.copytree(SS / 'AMD/Source', tmp / 'AMDZL/Source')
+    (tmp / 'AMDI/Include').mkdir(exist_ok=True, parents=True)
+    (tmp / 'AMDL/Include').mkdir(exist_ok=True, parents=True)
+    (tmp / 'AMDZL/Include').mkdir(exist_ok=True, parents=True)
+    shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDI/Include/amd_i_internal.h')
+    shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDL/Include/amd_l_internal.h')
+    shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDZL/Include/amd_zl_internal.h')
+    _add_macros(f=(tmp / 'AMDI/Include/amd_i_internal.h'), macros=['DINT'])
+    _add_macros(f=(tmp / 'AMDL/Include/amd_l_internal.h'), macros=['DLONG'])
+    _add_macros(f=(tmp / 'AMDZL/Include/amd_zl_internal.h'), macros=['ZLONG'])
+    for type_ in (('DINT', 'i', 'I'),
+                  ('DLONG', 'l', 'L'),
+                  ('ZLONG', 'zl', 'ZL')):
         for f in (tmp / f'AMD{type_[2]}/Source').glob('amd_*.c'):
             fnew = f.parent / f.name.replace('amd_', f'amd_{type_[1]}_')
             shutil.move(f, fnew)
             _add_macros(f=fnew, macros=[type_[0]])
+            _redirect_headers(f=fnew, headers=[('amd_internal.h', f'amd_{type_[1]}_internal.h')])            
     config.add_library(
         'amd',
         sources=([str(f.relative_to(SS.parent))
                   for f in (tmp / 'AMDI/Source').glob('amd_*.c')] +
                  [str(f.relative_to(SS.parent))
-                  for f in (tmp / 'AMDL/Source').glob('amd_*.c')]),
+                  for f in (tmp / 'AMDL/Source').glob('amd_*.c')] +
+                 [str(f.relative_to(SS.parent))
+                  for f in (tmp / 'AMDZL/Source').glob('amd_*.c')]),
         include_dirs=[
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
             str((SS / 'AMD/Include').relative_to(SS.parent)),
+            str((tmp / 'AMDI/Include').relative_to(SS.parent)),
+            str((tmp / 'AMDL/Include').relative_to(SS.parent)),
+            str((tmp / 'AMDZL/Include').relative_to(SS.parent)),
         ],
         libraries=['suitesparseconfig'],
         language='c')
@@ -268,7 +287,7 @@ def configuration(parent_package='', top_path=None):
         'cholmod',
         sources=cholmod_sources,
         include_dirs=[str((SS / 'SuiteSparse_config').relative_to(SS.parent))] + cholmod_includes,
-        libraries=['amd', 'colamd', 'suitesparseconfig', 'lapack', 'blas'],
+        libraries=['amd', 'colamd', 'suitesparseconfig'],
         language='c')    
 
     # SPQR
@@ -280,7 +299,7 @@ def configuration(parent_package='', top_path=None):
             str((SS / 'CHOLMOD/Include').relative_to(SS.parent)),
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
         ],
-        libraries=['amd', 'colamd', 'cholmod', 'suitesparseconfig', 'lapack', 'blas'],
+        libraries=['amd', 'colamd', 'cholmod', 'suitesparseconfig'],
         language='c')
 
     shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKI/Source')
@@ -296,10 +315,11 @@ def configuration(parent_package='', top_path=None):
                           ('dl', ['DLONG']),
                           ('zi', ['ZINT']),
                           ('zl', ['ZLONG'])]:
-        umf_hdrs[type_]= ([(f.name, f.name.replace('umf_', f'umf_{type_}_'))
-                           for f in (SS / 'UMFPACK/Source').glob('umf_*.h')] +
-                          [(f.name, f.name.replace('umfpack_', f'umfpack_{type_}_'))
-                           for f in (SS / 'UMFPACK/Source').glob('umfpack_*.h')])
+        umf_hdrs[type_] = ([(f.name, f.name.replace('umf_', f'umf_{type_}_'))
+                            for f in (SS / 'UMFPACK/Source').glob('umf_*.h')] +
+                           [(f.name, f.name.replace('umfpack_', f'umfpack_{type_}_'))
+                            for f in (SS / 'UMFPACK/Source').glob('umfpack_*.h')] +
+                           [('amd_internal.h', f'amd_{type_[-1] if type_ != "zl" else type_}_internal.h')])
         for f in (tmp / f'UMFPACK{type_.upper()}/Source/').glob('umf_*.h'):
             fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
             shutil.move(f, fnew.relative_to(SS.parent))
@@ -439,6 +459,9 @@ def configuration(parent_package='', top_path=None):
             str((tmp / 'UMFPACKDL/Source').relative_to(SS.parent)),
             str((tmp / 'UMFPACKZI/Source').relative_to(SS.parent)),
             str((tmp / 'UMFPACKZL/Source').relative_to(SS.parent)),
+            str((tmp / 'AMDI/Include').relative_to(SS.parent)),
+            str((tmp / 'AMDL/Include').relative_to(SS.parent)),
+            str((tmp / 'AMDZL/Include').relative_to(SS.parent)),            
             
             str((SS / 'UMFPACK/Include').relative_to(SS.parent)),
             str((SS / 'UMFPACK/Source').relative_to(SS.parent)),
@@ -446,9 +469,24 @@ def configuration(parent_package='', top_path=None):
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
             str((SS / 'CHOLMOD/Include').relative_to(SS.parent)),
         ],
-        libraries=['amd', 'cholmod', 'suitesparseconfig', 'lapack', 'blas'],
+        libraries=['amd', 'cholmod', 'suitesparseconfig'],
         language='c')
 
+    # UMFPACK test
+    lapack_opt = get_info('lapack')
+    config.add_extension(
+        'umfpack_demo',
+        sources=['umfpack_demo.c'],
+        include_dirs=[
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+            str((SS / 'AMD/Include').relative_to(SS.parent)),
+            str((SS / 'UMFPACK/Include').relative_to(SS.parent)),
+        ],
+        libraries=['umfpack'],
+        language='c',
+        extra_info=lapack_opt,
+    )
+    
     return config
 
 
