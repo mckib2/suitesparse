@@ -37,126 +37,188 @@ def configuration(parent_package='', top_path=None):
     config = Configuration('suitesparse', parent_package, top_path)
 
     # SuiteSparse_config
-    config.add_library(
-        'suitesparseconfig',
-        sources=[
-            str((SS / 'SuiteSparse_config/SuiteSparse_config.c').relative_to(SS.parent)),
-        ],
-        include_dirs=[
-            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
-        ],
-        language='c')
-
+    ss_config_opts = {
+        'name': 'suitesparseconfig',
+        'sources': [str((SS / 'SuiteSparse_config/SuiteSparse_config.c').relative_to(SS.parent))],
+        'include_dirs': [str((SS / 'SuiteSparse_config').relative_to(SS.parent))],
+        'language': 'c',
+    }
+    config.add_library(**ss_config_opts)
+    config.add_extension(**ss_config_opts,
+                         extra_info={
+                             'sources': ['suitesparseconfig_impl.c'],
+                             'libraries': ['suitesparseconfig'],
+                         })
+    
     # AMD
-    shutil.copytree(SS / 'AMD/Source', tmp / 'AMDI/Source')
-    shutil.copytree(SS / 'AMD/Source', tmp / 'AMDL/Source')
-    shutil.copytree(SS / 'AMD/Source', tmp / 'AMDZL/Source')
-    (tmp / 'AMDI/Include').mkdir(exist_ok=True, parents=True)
-    (tmp / 'AMDL/Include').mkdir(exist_ok=True, parents=True)
-    (tmp / 'AMDZL/Include').mkdir(exist_ok=True, parents=True)
-    shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDI/Include/amd_i_internal.h')
-    shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDL/Include/amd_l_internal.h')
-    shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDZL/Include/amd_zl_internal.h')
-    _add_macros(f=(tmp / 'AMDI/Include/amd_i_internal.h'), macros=['DINT'])
-    _add_macros(f=(tmp / 'AMDL/Include/amd_l_internal.h'), macros=['DLONG'])
-    _add_macros(f=(tmp / 'AMDZL/Include/amd_zl_internal.h'), macros=['ZLONG'])
-    for type_ in (('DINT', 'i', 'I'),
-                  ('DLONG', 'l', 'L'),
-                  ('ZLONG', 'zl', 'ZL')):
-        for f in (tmp / f'AMD{type_[2]}/Source').glob('amd_*.c'):
-            fnew = f.parent / f.name.replace('amd_', f'amd_{type_[1]}_')
-            shutil.move(f, fnew)
-            _add_macros(f=fnew, macros=[type_[0]])
-            _redirect_headers(f=fnew, headers=[('amd_internal.h', f'amd_{type_[1]}_internal.h')])            
-    config.add_library(
-        'amd',
-        sources=([str(f.relative_to(SS.parent))
-                  for f in (tmp / 'AMDI/Source').glob('amd_*.c')] +
-                 [str(f.relative_to(SS.parent))
-                  for f in (tmp / 'AMDL/Source').glob('amd_*.c')] +
-                 [str(f.relative_to(SS.parent))
-                  for f in (tmp / 'AMDZL/Source').glob('amd_*.c')]),
-        include_dirs=[
+    if not (tmp / 'AMDI/Include').exists():
+        (tmp / 'AMDI/Include').mkdir(exist_ok=True, parents=True)
+        (tmp / 'AMDL/Include').mkdir(exist_ok=True, parents=True)
+        shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDI/Include/amd_i_internal.h')
+        shutil.copyfile(SS / 'AMD/Include/amd_internal.h', tmp / 'AMDL/Include/amd_l_internal.h')
+        _add_macros(f=(tmp / 'AMDI/Include/amd_i_internal.h'), macros=['DINT'])
+        _add_macros(f=(tmp / 'AMDL/Include/amd_l_internal.h'), macros=['DLONG'])
+    if not (tmp / 'AMDI/Source').exists():
+        shutil.copytree(SS / 'AMD/Source', tmp / 'AMDI/Source')
+        shutil.copytree(SS / 'AMD/Source', tmp / 'AMDL/Source')
+        for type_ in (('DINT', 'i', 'I'),
+                      ('DLONG', 'l', 'L')):
+            for f in (tmp / f'AMD{type_[2]}/Source').glob('amd_*.c'):
+                fnew = f.parent / f.name.replace('amd_', f'amd_{type_[1]}_')
+                shutil.move(f, fnew)
+                _add_macros(f=fnew, macros=[type_[0]])
+                _redirect_headers(f=fnew, headers=[('amd_internal.h', f'amd_{type_[1]}_internal.h')])
+
+    amd_opts = {
+        'name': 'amd',
+        'sources': ([str(f.relative_to(SS.parent))
+                     for f in (tmp / 'AMDI/Source').glob('amd_*.c')] +
+                    [str(f.relative_to(SS.parent))
+                     for f in (tmp / 'AMDL/Source').glob('amd_*.c')]),
+        'include_dirs': [
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
             str((SS / 'AMD/Include').relative_to(SS.parent)),
             str((tmp / 'AMDI/Include').relative_to(SS.parent)),
             str((tmp / 'AMDL/Include').relative_to(SS.parent)),
-            str((tmp / 'AMDZL/Include').relative_to(SS.parent)),
         ],
-        libraries=['suitesparseconfig'],
-        language='c')
+        'libraries': ['suitesparseconfig'],
+        'language': 'c',
+    }
+    config.add_library(**amd_opts)
+    config.add_extension(**amd_opts, extra_info={
+        'sources': ['amd_impl.c'],
+        'export_symbols':[
+            'amd_order', 'amd_l_order', 'amd_2', 'amd_l2', 'amd_valid',
+            'amd_l_valid', 'amd_defaults', 'amd_l_defaults', 'amd_control',
+            'amd_l_control', 'amd_info', 'amd_l_info',
+        ],
+        'libraries': ['amd'],
+    })
 
     # CAMD
-    shutil.copytree(SS / 'CAMD/Source', tmp / 'CAMDI/Source')
-    shutil.copytree(SS / 'CAMD/Source', tmp / 'CAMDL/Source')
-    (tmp / 'CAMDI/Include').mkdir(exist_ok=True, parents=True)
-    (tmp / 'CAMDL/Include').mkdir(exist_ok=True, parents=True)
-    shutil.copyfile(SS / 'CAMD/Include/camd_internal.h', tmp / 'CAMDI/Include/camd_i_internal.h')
-    shutil.copyfile(SS / 'CAMD/Include/camd_internal.h', tmp / 'CAMDL/Include/camd_l_internal.h')
-    _add_macros(f=(tmp / f'CAMDI/Include/camd_i_internal.h'), macros=['DINT'])
-    _add_macros(f=(tmp / f'CAMDL/Include/camd_l_internal.h'), macros=['DLONG'])
-    for type_ in (('DINT', 'i', 'I'), ('DLONG', 'l', 'L')):
-        for f in (tmp / f'CAMD{type_[2]}/Source').glob('camd_*.c'):
-            fnew = f.parent / f.name.replace('camd_', f'camd_{type_[1]}_')
-            shutil.move(f, fnew)
-            _add_macros(f=fnew, macros=[type_[0]])
-            _redirect_headers(f=fnew, headers=[('camd_internal.h', f'camd_{type_[1]}_internal.h')])
-    config.add_library(
-        'camd',
-        sources=([str(f.relative_to(SS.parent))
-                  for f in (tmp / 'CAMDI/Source').glob('camd_*.c')] +
-                 [str(f.relative_to(SS.parent))
-                  for f in (tmp / 'CAMDL/Source').glob('camd_*.c')]),
-        include_dirs=[
+    if not (tmp / 'CAMDI/Include').exists():
+        (tmp / 'CAMDI/Include').mkdir(exist_ok=True, parents=True)
+        (tmp / 'CAMDL/Include').mkdir(exist_ok=True, parents=True)
+        shutil.copyfile(SS / 'CAMD/Include/camd_internal.h', tmp / 'CAMDI/Include/camd_i_internal.h')
+        shutil.copyfile(SS / 'CAMD/Include/camd_internal.h', tmp / 'CAMDL/Include/camd_l_internal.h')
+        _add_macros(f=(tmp / f'CAMDI/Include/camd_i_internal.h'), macros=['DINT'])
+        _add_macros(f=(tmp / f'CAMDL/Include/camd_l_internal.h'), macros=['DLONG'])
+    if not (tmp / 'CAMDI/Source').exists():
+        shutil.copytree(SS / 'CAMD/Source', tmp / 'CAMDI/Source')
+        shutil.copytree(SS / 'CAMD/Source', tmp / 'CAMDL/Source')
+        for type_ in (('DINT', 'i', 'I'), ('DLONG', 'l', 'L')):
+            for f in (tmp / f'CAMD{type_[2]}/Source').glob('camd_*.c'):
+                fnew = f.parent / f.name.replace('camd_', f'camd_{type_[1]}_')
+                shutil.move(f, fnew)
+                _add_macros(f=fnew, macros=[type_[0]])
+                _redirect_headers(f=fnew, headers=[('camd_internal.h', f'camd_{type_[1]}_internal.h')])
+
+    camd_opts = {
+        'name': 'camd',
+        'sources': ([str(f.relative_to(SS.parent))
+                     for f in (tmp / 'CAMDI/Source').glob('camd_*.c')] +
+                    [str(f.relative_to(SS.parent))
+                     for f in (tmp / 'CAMDL/Source').glob('camd_*.c')]),
+        'include_dirs': [
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
             str((SS / 'CAMD/Include').relative_to(SS.parent)),
             str((tmp / 'CAMDI/Include').relative_to(SS.parent)),
             str((tmp / 'CAMDL/Include').relative_to(SS.parent)),
         ],
-        libraries=['suitesparseconfig'],
-        language='c')
+        'libraries': ['suitesparseconfig'],
+        'language': 'c',
+    }
+                
+    config.add_library(**camd_opts)
+    config.add_extension(**camd_opts, extra_info={
+        'sources': ['camd_impl.c'],
+        'export_symbols': [
+            'camd_order', 'camd_l_order', 'camd_2', 'camd_l2', 'camd_valid',
+            'camd_l_valid', 'camd_cvalid', 'camd_l_cvalid', 'camd_defaults',
+            'camd_l_defaults', 'camd_control', 'camd_l_control', 'camd_info',
+            'camd_l_info',
+        ],
+        'libraries': ['camd'],
+    })
 
     # COLAMD
-    shutil.copytree(SS / 'COLAMD/Source', tmp / 'COLAMDI/Source')
-    shutil.copytree(SS / 'COLAMD/Source', tmp / 'COLAMDL/Source')
-    for type_ in (('', '', 'I'), ('DLONG', '_l', 'L')):
-        f = (tmp / f'COLAMD{type_[2]}/Source/colamd.c')
-        fnew = f.parent / f'colamd{type_[1]}.c'
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=[type_[0]])
-    config.add_library(
-        'colamd',
-        sources=[
+    if not (tmp / 'COLAMDI/Source').exists():
+        shutil.copytree(SS / 'COLAMD/Source', tmp / 'COLAMDI/Source')
+        shutil.copytree(SS / 'COLAMD/Source', tmp / 'COLAMDL/Source')
+        for type_ in (('', '', 'I'), ('DLONG', '_l', 'L')):
+            f = (tmp / f'COLAMD{type_[2]}/Source/colamd.c')
+            fnew = f.parent / f'colamd{type_[1]}.c'
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=[type_[0]])
+
+    colamd_opts = {
+        'name': 'colamd',
+        'sources': [
             str((tmp / 'COLAMDI/Source/colamd.c').relative_to(SS.parent)),
             str((tmp / 'COLAMDL/Source/colamd_l.c').relative_to(SS.parent)),
         ],
-        include_dirs=[
+        'include_dirs': [
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
             str((SS / 'COLAMD/Include').relative_to(SS.parent)),
         ],
-        libraries=['suitesparseconfig'],
-        language='c')
+        'libraries': ['suitesparseconfig'],
+        'language': 'c',
+    }
+            
+    config.add_library(**colamd_opts)
+    config.add_extension(**colamd_opts, extra_info={
+        'sources': ['colamd_impl.c'],
+        'libraries': ['colamd'],
+        'export_symbols': [
+            'colamd_recommended', 'colamd_l_recommended',
+            'colamd_set_defaults', 'colamd_l_set_defaults',
+            'colamd', 'colamd_l', 'symamd', 'symamd_l',
+            'colamd_report', 'colamd_l_report',
+            'symamd_report', 'symamd_l_report',
+        ],
+    })
 
     # CCOLAMD
-    shutil.copytree(SS / 'CCOLAMD/Source', tmp / 'CCOLAMDI/Source')
-    shutil.copytree(SS / 'CCOLAMD/Source', tmp / 'CCOLAMDL/Source')
-    for type_ in (('', '', 'I'), ('DLONG', '_l', 'L')):
-        f = (tmp / f'CCOLAMD{type_[2]}/Source/ccolamd.c')
-        fnew = f.parent / f'ccolamd{type_[1]}.c'
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=[type_[0]])
-    config.add_library(
-        'ccolamd',
-        sources=[
+    if not (tmp / 'CCOLAMDI/Source').exists():
+        shutil.copytree(SS / 'CCOLAMD/Source', tmp / 'CCOLAMDI/Source')
+        shutil.copytree(SS / 'CCOLAMD/Source', tmp / 'CCOLAMDL/Source')
+        for type_ in (('', '', 'I'), ('DLONG', '_l', 'L')):
+            f = (tmp / f'CCOLAMD{type_[2]}/Source/ccolamd.c')
+            fnew = f.parent / f'ccolamd{type_[1]}.c'
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=[type_[0]])
+
+    ccolamd_opts = {
+        'name': 'ccolamd',
+        'sources': [
             str((tmp / 'CCOLAMDI/Source/ccolamd.c').relative_to(SS.parent)),
             str((tmp / 'CCOLAMDL/Source/ccolamd_l.c').relative_to(SS.parent)),
         ],
-        include_dirs=[
+        'include_dirs': [
             str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
             str((SS / 'CCOLAMD/Include').relative_to(SS.parent)),
         ],
-        libraries=['suitesparseconfig'],
-        language='c')
+        'libraries': ['suitesparseconfig'],
+        'language': 'c',
+    }
+            
+    config.add_library(**ccolamd_opts)
+    config.add_extension(**ccolamd_opts, extra_info={
+        'sources': ['ccolamd_impl.c'],
+        'libraries': ['ccolamd'],
+        'export_symbols': [
+            'ccolamd_recommended', 'ccolamd_l_recommended',
+            'ccolamd_set_defaults', 'ccolamd_l_set_defaults',
+            'ccolamd', 'ccolamd_l', 'csymamd', 'csymamd_l',
+            'ccolamd_report', 'ccolamd_l_report',
+            'csymamd_report', 'csymamd_l_report',
+            'ccolamd2', 'ccolamd2_l',
+            'ccolamd_apply_order', 'ccolamd_l_apply_order',
+            'ccolamd_fsize', 'ccolamd_l_fsize',
+            'ccolamd_postorder', 'ccolamd_l_postorder',
+            'ccolamd_post_tree', 'ccolamd_l_post_tree',
+        ],
+    })
 
     # CHOLMOD/Check module
     cholmod_sources = [str((SS / 'CHOLMOD/Check/cholmod_check.c').relative_to(SS.parent)),
@@ -170,70 +232,55 @@ def configuration(parent_package='', top_path=None):
                         str((SS / 'COLAMD/Include').relative_to(SS.parent)),
                         str((SS / 'CHOLMOD/Include').relative_to(SS.parent)),
                         str((tmp / 'CHOLMODL/Include').relative_to(SS.parent))]
-    shutil.copytree(SS / 'CHOLMOD/Check', tmp / 'CHOLMODL/Check')
-    shutil.copytree(SS / 'CHOLMOD/Include', tmp / 'CHOLMODL/Include')
-    cholmod_l_hdrs = [(hdr.name, hdr.name.replace('cholmod', 'cholmod_l')) for hdr in (SS / 'CHOLMOD/Include').glob('*.h')]
-    for f in (tmp / 'CHOLMODL/Include').glob('*.h'):
-        fnew = f.parent / f.name.replace('cholmod', 'cholmod_l')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
 
-    for f in (tmp / 'CHOLMODL/Check').glob('cholmod_*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=[('cholmod_internal.h', 'cholmod_l_internal.h'),
-                                           ('cholmod_check.h', 'cholmod_l_check.h'),
-                                           ('cholmod_config.h', 'cholmod_l_config.h'),
-                                           ('cholmod_matrixops.h', 'cholmod_l_matrixops.h')])
+    cholmod_l_hdrs = [(hdr.name, hdr.name.replace('cholmod', 'cholmod_l')) for hdr in (SS / 'CHOLMOD/Include').glob('*.h')]
+    if not (tmp / 'CHOLMODL/Include').exists():
+        shutil.copytree(SS / 'CHOLMOD/Include', tmp / 'CHOLMODL/Include')
+        for f in (tmp / 'CHOLMODL/Include').glob('*.h'):
+            fnew = f.parent / f.name.replace('cholmod', 'cholmod_l')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
+
+    if not (tmp / 'CHOLMODL/Check').exists():
+        shutil.copytree(SS / 'CHOLMOD/Check', tmp / 'CHOLMODL/Check')
+        for f in (tmp / 'CHOLMODL/Check').glob('cholmod_*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=[('cholmod_internal.h', 'cholmod_l_internal.h'),
+                                               ('cholmod_check.h', 'cholmod_l_check.h'),
+                                               ('cholmod_config.h', 'cholmod_l_config.h'),
+                                               ('cholmod_matrixops.h', 'cholmod_l_matrixops.h')])
 
     # CHOLMOD/Core module
-    cholmod_sources += [str(SS / 'CHOLMOD/Core/cholmod_common.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_change_factor.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_memory.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_sparse.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_complex.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_band.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_copy.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_error.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_aat.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_add.c'),
-                        str(SS / 'CHOLMOD/Core/cholmod_version.c'),
-                        
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_common.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_change_factor.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_memory.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_sparse.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_complex.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_band.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_copy.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_error.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_aat.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_add.c'),
-                        str(tmp / 'CHOLMODL/Core/cholmod_l_version.c')]
-    shutil.copytree(SS / 'CHOLMOD/Core', tmp / 'CHOLMODL/Core')
-    for f in (tmp / 'CHOLMODL/Core').glob('*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_change_factor.c', 't_cholmod_l_change_factor.c'),
-                                                            ('t_cholmod_dense', 't_cholmod_l_dense'),
-                                                            ('t_cholmod_transpose', 't_cholmod_l_transpose'),
-                                                            ('t_cholmod_triplet', 't_cholmod_l_triplet')])
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Core').glob('cholmod_*.c')]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Core').glob('cholmod_*.c')]
+    if not (tmp / 'CHOLMODL/Core').exists():
+        shutil.copytree(SS / 'CHOLMOD/Core', tmp / 'CHOLMODL/Core')
+        for f in (tmp / 'CHOLMODL/Core').glob('*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_change_factor.c', 't_cholmod_l_change_factor.c'),
+                                                                ('t_cholmod_dense.c', 't_cholmod_l_dense.c'),
+                                                                ('t_cholmod_transpose.c', 't_cholmod_l_transpose.c'),
+                                                                ('t_cholmod_triplet.c', 't_cholmod_l_triplet.c')])
 
     # CHOLMOD/Cholesky module
     cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Cholesky').glob('cholmod_*.c')]
-    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Cholesky').glob('cholmod_*.c')]    
-    shutil.copytree(SS / 'CHOLMOD/Cholesky', tmp / 'CHOLMODL/Cholesky')
-    for f in (tmp / 'CHOLMODL/Cholesky').glob('*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_lsolve.c', 't_cholmod_l_lsolve.c'),
-                                                            ('t_cholmod_ltsolve.c', 't_cholmod_l_ltsolve.c'),
-                                                            ('t_cholmod_rowfac.c', 't_cholmod_l_rowfac.c'),
-                                                            ('t_cholmod_solve.c', 't_cholmod_l_solve.c')])
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Cholesky').glob('cholmod_*.c')]
+    if not (tmp / 'CHOLMODL/Cholesky').exists():
+        shutil.copytree(SS / 'CHOLMOD/Cholesky', tmp / 'CHOLMODL/Cholesky')
+        for f in (tmp / 'CHOLMODL/Cholesky').glob('*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_lsolve.c', 't_cholmod_l_lsolve.c'),
+                                                                ('t_cholmod_ltsolve.c', 't_cholmod_l_ltsolve.c'),
+                                                                ('t_cholmod_rowfac.c', 't_cholmod_l_rowfac.c'),
+                                                                ('t_cholmod_solve.c', 't_cholmod_l_solve.c'),
+                                                                ('t_cholmod_dense.c', 't_cholmod_l_dense.c')])
     
     # CHOLMOD/Partition module
     cholmod_includes += [
@@ -242,54 +289,69 @@ def configuration(parent_package='', top_path=None):
         str((SS / 'CCOLAMD/Include').relative_to(SS.parent)),
     ]
     cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Partition').glob('cholmod_*.c')]
-    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Partition').glob('cholmod_l_*.c')]    
-    shutil.copytree(SS / 'CHOLMOD/Partition', tmp / 'CHOLMODL/Parititon')
-    for f in (tmp / 'CHOLMODL/Parititon').glob('*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Partition').glob('cholmod_l_*.c')]
+    if not (tmp / 'CHOLMODL/Parititon').exists():
+        shutil.copytree(SS / 'CHOLMOD/Partition', tmp / 'CHOLMODL/Parititon')
+        for f in (tmp / 'CHOLMODL/Parititon').glob('*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
 
     # CHOLMOD/MatrixOps module
     cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/MatrixOps').glob('cholmod_*.c')]
-    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/MatrixOps').glob('cholmod_l_*.c')]    
-    shutil.copytree(SS / 'CHOLMOD/MatrixOps', tmp / 'CHOLMODL/MatrixOps')
-    for f in (tmp / 'CHOLMODL/MatrixOps').glob('*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_sdmult.c', 't_cholmod_l_sdmult.c')])
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/MatrixOps').glob('cholmod_l_*.c')]
+    if not (tmp / 'CHOLMODL/MatrixOps').exists():
+        shutil.copytree(SS / 'CHOLMOD/MatrixOps', tmp / 'CHOLMODL/MatrixOps')
+        for f in (tmp / 'CHOLMODL/MatrixOps').glob('*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_sdmult.c', 't_cholmod_l_sdmult.c')])
 
     # CHOLMOD/Modify module
     cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Modify').glob('cholmod_*.c')]
-    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Modify').glob('cholmod_l_*.c')]    
-    shutil.copytree(SS / 'CHOLMOD/Modify', tmp / 'CHOLMODL/Modify')
-    for f in (tmp / 'CHOLMODL/Modify').glob('*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_updown.c', 't_cholmod_l_updown.c'),
-                                                            ('t_cholmod_updown_numkr.c', 't_cholmod_l_updown_numkr.c')])
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Modify').glob('cholmod_l_*.c')]
+    if not (tmp / 'CHOLMODL/Modify').exists():
+        shutil.copytree(SS / 'CHOLMOD/Modify', tmp / 'CHOLMODL/Modify')
+        for f in (tmp / 'CHOLMODL/Modify').glob('*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_updown.c', 't_cholmod_l_updown.c'),
+                                                                ('t_cholmod_updown_numkr.c', 't_cholmod_l_updown_numkr.c')])
 
     # CHOLMOD/Supernodal module
     cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Supernodal').glob('cholmod_*.c')]
-    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Supernodal').glob('cholmod_l_*.c')]    
-    shutil.copytree(SS / 'CHOLMOD/Supernodal', tmp / 'CHOLMODL/Supernodal')
-    for f in (tmp / 'CHOLMODL/Supernodal').glob('*.c'):
-        fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
-        shutil.move(f, fnew)
-        _add_macros(f=fnew, macros=['DLONG'])
-        _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_super_numeric.c', 't_cholmod_l_super_numeric.c'),
-                                                            ('t_cholmod_super_solve.c', 't_cholmod_l_super_solve.c')])
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Supernodal').glob('cholmod_l_*.c')]
+    if not (tmp / 'CHOLMODL/Supernodal').exists():
+        shutil.copytree(SS / 'CHOLMOD/Supernodal', tmp / 'CHOLMODL/Supernodal')
+        for f in (tmp / 'CHOLMODL/Supernodal').glob('*.c'):
+            fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=['DLONG'])
+            _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_super_numeric.c', 't_cholmod_l_super_numeric.c'),
+                                                                ('t_cholmod_super_solve.c', 't_cholmod_l_super_solve.c')])
 
     # CHOLMOD
-    config.add_library(
-        'cholmod',
-        sources=cholmod_sources,
-        include_dirs=[str((SS / 'SuiteSparse_config').relative_to(SS.parent))] + cholmod_includes,
-        libraries=['amd', 'colamd', 'suitesparseconfig'],
-        language='c')    
+    #lapack_info = get_info('lapack')
+    cholmod_opts = {
+        'name': 'cholmod',
+        'sources': cholmod_sources,
+        'include_dirs': [str((SS / 'SuiteSparse_config').relative_to(SS.parent))] + cholmod_includes,
+        'libraries': ['amd', 'colamd', 'suitesparseconfig'],
+        'language': 'c',
+    }
+    config.add_library(**cholmod_opts, macros=[('NPARTITION', None)])
+    config.add_extension(**cholmod_opts, extra_info={
+        'sources': ['cholmod_impl.c'],
+        'libraries': ['cholmod', 'openblas'],
+        'define_macros': [('NPARTITION', None)],
+        'export_symbols': [],
+    })
 
+    return config
+    
     # SPQR
     config.add_library(
         'spqr',
@@ -500,10 +562,10 @@ if __name__ == '__main__':
     # try...finally statement ensures tmp dir is removed at end
     # of setup
     try:
-        if tmp.exists():
-            logger.info(f'Removing tmp dir {tmp} to start')
-            shutil.rmtree(tmp)
-        tmp.mkdir()
+        #if tmp.exists():
+        #    logger.info(f'Removing tmp dir {tmp} to start')
+        #    shutil.rmtree(tmp)
+        #tmp.mkdir()
         setup(**configuration().todict())
     finally:
         if DEBUG:
