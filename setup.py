@@ -8,7 +8,7 @@ import re
 logging.basicConfig()
 logger = logging.getLogger('suitesparse-setup')
 SS = pathlib.Path(__file__).parent / 'SuiteSparse'
-tmp = pathlib.Path(__file__).parent / '.suitesparse_tmp'
+tmp = pathlib.Path(__file__).parent / '.sstmp'
 DEBUG = True
 
 
@@ -38,9 +38,12 @@ def configuration(parent_package='', top_path=None):
     # SuiteSparse_config
     config.add_library(
         'suitesparseconfig',
-        sources=[str(SS / 'SuiteSparse_config/SuiteSparse_config.c')],
-        include_dirs=[str(SS / 'SuiteSparse_config')],
-        depends=[str(SS / 'SuiteSparse_config/SuiteSparse_config.h')],
+        sources=[
+            str((SS / 'SuiteSparse_config/SuiteSparse_config.c').relative_to(SS.parent)),
+        ],
+        include_dirs=[
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+        ],
         language='c')
 
     # AMD
@@ -53,8 +56,14 @@ def configuration(parent_package='', top_path=None):
             _add_macros(f=fnew, macros=[type_[0]])
     config.add_library(
         'amd',
-        sources=[str(f) for f in (tmp / 'AMDI/Source').glob('amd_*.c')] + [str(f) for f in (tmp / 'AMDL/Source').glob('amd_*.c')],
-        include_dirs=[str(SS / 'SuiteSparse_config'), str(SS / 'AMD/Include')],
+        sources=([str(f.relative_to(SS.parent))
+                  for f in (tmp / 'AMDI/Source').glob('amd_*.c')] +
+                 [str(f.relative_to(SS.parent))
+                  for f in (tmp / 'AMDL/Source').glob('amd_*.c')]),
+        include_dirs=[
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+            str((SS / 'AMD/Include').relative_to(SS.parent)),
+        ],
         libraries=['suitesparseconfig'],
         language='c')
 
@@ -75,8 +84,16 @@ def configuration(parent_package='', top_path=None):
             _redirect_headers(f=fnew, headers=[('camd_internal.h', f'camd_{type_[1]}_internal.h')])
     config.add_library(
         'camd',
-        sources=[str(f) for f in (tmp / 'CAMDI/Source').glob('camd_*.c')] + [str(f) for f in (tmp / 'CAMDL/Source').glob('camd_*.c')],
-        include_dirs=[str(SS / 'SuiteSparse_config'), str(SS / 'CAMD/Include'), str(tmp / 'CAMDI/Include'), str(tmp / 'CAMDL/Include')],
+        sources=([str(f.relative_to(SS.parent))
+                  for f in (tmp / 'CAMDI/Source').glob('camd_*.c')] +
+                 [str(f.relative_to(SS.parent))
+                  for f in (tmp / 'CAMDL/Source').glob('camd_*.c')]),
+        include_dirs=[
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+            str((SS / 'CAMD/Include').relative_to(SS.parent)),
+            str((tmp / 'CAMDI/Include').relative_to(SS.parent)),
+            str((tmp / 'CAMDL/Include').relative_to(SS.parent)),
+        ],
         libraries=['suitesparseconfig'],
         language='c')
 
@@ -90,8 +107,14 @@ def configuration(parent_package='', top_path=None):
         _add_macros(f=fnew, macros=[type_[0]])
     config.add_library(
         'colamd',
-        sources=[str(tmp / 'COLAMDI/Source/colamd.c'), str(tmp / 'COLAMDL/Source/colamd_l.c')],
-        include_dirs=[str(SS / 'SuiteSparse_config'), str(SS / 'COLAMD/Include')],
+        sources=[
+            str((tmp / 'COLAMDI/Source/colamd.c').relative_to(SS.parent)),
+            str((tmp / 'COLAMDL/Source/colamd_l.c').relative_to(SS.parent)),
+        ],
+        include_dirs=[
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+            str((SS / 'COLAMD/Include').relative_to(SS.parent)),
+        ],
         libraries=['suitesparseconfig'],
         language='c')
 
@@ -105,23 +128,29 @@ def configuration(parent_package='', top_path=None):
         _add_macros(f=fnew, macros=[type_[0]])
     config.add_library(
         'ccolamd',
-        sources=[str(tmp / 'CCOLAMDI/Source/ccolamd.c'), str(tmp / 'CCOLAMDL/Source/ccolamd_l.c')],
-        include_dirs=[str(SS / 'SuiteSparse_config'), str(SS / 'CCOLAMD/Include')],
+        sources=[
+            str((tmp / 'CCOLAMDI/Source/ccolamd.c').relative_to(SS.parent)),
+            str((tmp / 'CCOLAMDL/Source/ccolamd_l.c').relative_to(SS.parent)),
+        ],
+        include_dirs=[
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+            str((SS / 'CCOLAMD/Include').relative_to(SS.parent)),
+        ],
         libraries=['suitesparseconfig'],
         language='c')
 
     # CHOLMOD/Check module
-    cholmod_sources = [str(SS / 'CHOLMOD/Check/cholmod_check.c'),
-                       str(SS / 'CHOLMOD/Check/cholmod_read.c'),
-                       str(SS / 'CHOLMOD/Check/cholmod_write.c'),
-                       str(tmp / 'CHOLMODL/Check/cholmod_l_check.c'),
-                       str(tmp / 'CHOLMODL/Check/cholmod_l_read.c'),
-                       str(tmp / 'CHOLMODL/Check/cholmod_l_write.c')]
-    cholmod_includes = [str(SS / 'AMD/Include'),
-                        str(SS / 'AMD/Source'),
-                        str(SS / 'COLAMD/Include'),
-                        str(SS / 'CHOLMOD/Include'),
-                        str(tmp / 'CHOLMODL/Include')]
+    cholmod_sources = [str((SS / 'CHOLMOD/Check/cholmod_check.c').relative_to(SS.parent)),
+                       str((SS / 'CHOLMOD/Check/cholmod_read.c').relative_to(SS.parent)),
+                       str((SS / 'CHOLMOD/Check/cholmod_write.c').relative_to(SS.parent)),
+                       str((tmp / 'CHOLMODL/Check/cholmod_l_check.c').relative_to(SS.parent)),
+                       str((tmp / 'CHOLMODL/Check/cholmod_l_read.c').relative_to(SS.parent)),
+                       str((tmp / 'CHOLMODL/Check/cholmod_l_write.c').relative_to(SS.parent))]
+    cholmod_includes = [str((SS / 'AMD/Include').relative_to(SS.parent)),
+                        str((SS / 'AMD/Source').relative_to(SS.parent)),
+                        str((SS / 'COLAMD/Include').relative_to(SS.parent)),
+                        str((SS / 'CHOLMOD/Include').relative_to(SS.parent)),
+                        str((tmp / 'CHOLMODL/Include').relative_to(SS.parent))]
     shutil.copytree(SS / 'CHOLMOD/Check', tmp / 'CHOLMODL/Check')
     shutil.copytree(SS / 'CHOLMOD/Include', tmp / 'CHOLMODL/Include')
     cholmod_l_hdrs = [(hdr.name, hdr.name.replace('cholmod', 'cholmod_l')) for hdr in (SS / 'CHOLMOD/Include').glob('*.h')]
@@ -175,8 +204,8 @@ def configuration(parent_package='', top_path=None):
                                                             ('t_cholmod_triplet', 't_cholmod_l_triplet')])
 
     # CHOLMOD/Cholesky module
-    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Cholesky').glob('cholmod_*.c')]
-    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Cholesky').glob('cholmod_*.c')]    
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Cholesky').glob('cholmod_*.c')]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Cholesky').glob('cholmod_*.c')]    
     shutil.copytree(SS / 'CHOLMOD/Cholesky', tmp / 'CHOLMODL/Cholesky')
     for f in (tmp / 'CHOLMODL/Cholesky').glob('*.c'):
         fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
@@ -188,9 +217,13 @@ def configuration(parent_package='', top_path=None):
                                                             ('t_cholmod_solve.c', 't_cholmod_l_solve.c')])
     
     # CHOLMOD/Partition module
-    cholmod_includes += [str(SS / 'metis-5.1.0/include'), str(SS / 'CAMD/Include'), str(SS / 'CCOLAMD/Include')]
-    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Partition').glob('cholmod_*.c')]
-    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Partition').glob('cholmod_l_*.c')]    
+    cholmod_includes += [
+        str((SS / 'metis-5.1.0/include').relative_to(SS.parent)),
+        str((SS / 'CAMD/Include').relative_to(SS.parent)),
+        str((SS / 'CCOLAMD/Include').relative_to(SS.parent)),
+    ]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Partition').glob('cholmod_*.c')]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Partition').glob('cholmod_l_*.c')]    
     shutil.copytree(SS / 'CHOLMOD/Partition', tmp / 'CHOLMODL/Parititon')
     for f in (tmp / 'CHOLMODL/Parititon').glob('*.c'):
         fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
@@ -199,8 +232,8 @@ def configuration(parent_package='', top_path=None):
         _redirect_headers(f=fnew, headers=cholmod_l_hdrs)
 
     # CHOLMOD/MatrixOps module
-    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/MatrixOps').glob('cholmod_*.c')]
-    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/MatrixOps').glob('cholmod_l_*.c')]    
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/MatrixOps').glob('cholmod_*.c')]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/MatrixOps').glob('cholmod_l_*.c')]    
     shutil.copytree(SS / 'CHOLMOD/MatrixOps', tmp / 'CHOLMODL/MatrixOps')
     for f in (tmp / 'CHOLMODL/MatrixOps').glob('*.c'):
         fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
@@ -209,8 +242,8 @@ def configuration(parent_package='', top_path=None):
         _redirect_headers(f=fnew, headers=cholmod_l_hdrs + [('t_cholmod_sdmult.c', 't_cholmod_l_sdmult.c')])
 
     # CHOLMOD/Modify module
-    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Modify').glob('cholmod_*.c')]
-    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Modify').glob('cholmod_l_*.c')]    
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Modify').glob('cholmod_*.c')]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Modify').glob('cholmod_l_*.c')]    
     shutil.copytree(SS / 'CHOLMOD/Modify', tmp / 'CHOLMODL/Modify')
     for f in (tmp / 'CHOLMODL/Modify').glob('*.c'):
         fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
@@ -220,8 +253,8 @@ def configuration(parent_package='', top_path=None):
                                                             ('t_cholmod_updown_numkr.c', 't_cholmod_l_updown_numkr.c')])
 
     # CHOLMOD/Supernodal module
-    cholmod_sources += [str(f) for f in (SS / 'CHOLMOD/Supernodal').glob('cholmod_*.c')]
-    cholmod_sources += [str(f) for f in (tmp / 'CHOLMODL/Supernodal').glob('cholmod_l_*.c')]    
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (SS / 'CHOLMOD/Supernodal').glob('cholmod_*.c')]
+    cholmod_sources += [str(f.relative_to(SS.parent)) for f in (tmp / 'CHOLMODL/Supernodal').glob('cholmod_l_*.c')]    
     shutil.copytree(SS / 'CHOLMOD/Supernodal', tmp / 'CHOLMODL/Supernodal')
     for f in (tmp / 'CHOLMODL/Supernodal').glob('*.c'):
         fnew = f.parent / f.name.replace('cholmod_', 'cholmod_l_')
@@ -234,15 +267,19 @@ def configuration(parent_package='', top_path=None):
     config.add_library(
         'cholmod',
         sources=cholmod_sources,
-        include_dirs=[str(SS / 'SuiteSparse_config')] + cholmod_includes,
+        include_dirs=[str((SS / 'SuiteSparse_config').relative_to(SS.parent))] + cholmod_includes,
         libraries=['amd', 'colamd', 'suitesparseconfig', 'lapack', 'blas'],
         language='c')    
 
     # SPQR
     config.add_library(
         'spqr',
-        sources=[str(f) for f in (SS / 'SPQR/Source').glob('*.cpp')],
-        include_dirs=[str(SS / 'SPQR/Include'), str(SS / 'CHOLMOD/Include'), str(SS / 'SuiteSparse_config')],
+        sources=[str(f.relative_to(SS.parent)) for f in (SS / 'SPQR/Source').glob('*.cpp')],
+        include_dirs=[
+            str((SS / 'SPQR/Include').relative_to(SS.parent)),
+            str((SS / 'CHOLMOD/Include').relative_to(SS.parent)),
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+        ],
         libraries=['amd', 'colamd', 'cholmod', 'suitesparseconfig', 'lapack', 'blas'],
         language='c')
 
@@ -265,7 +302,7 @@ def configuration(parent_package='', top_path=None):
                            for f in (SS / 'UMFPACK/Source').glob('umfpack_*.h')])
         for f in (tmp / f'UMFPACK{type_.upper()}/Source/').glob('umf_*.h'):
             fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
-            shutil.move(f, fnew)
+            shutil.move(f, fnew.relative_to(SS.parent))
             _add_macros(f=fnew, macros=macros)
             _redirect_headers(f=fnew, headers=umf_hdrs[type_])
 
@@ -279,7 +316,7 @@ def configuration(parent_package='', top_path=None):
         for f0 in UMFINT:
             f = tmp / f'UMFPACK{type_.upper()}/Source/{f0}.c'
             fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
-            umfpack_sources.append(str(fnew))
+            umfpack_sources.append(str(fnew.relative_to(SS.parent)))
             shutil.move(f, fnew)
             _add_macros(f=fnew, macros=[macro])
             _redirect_headers(f=fnew, headers=umf_hdrs[type_])
@@ -317,7 +354,8 @@ def configuration(parent_package='', top_path=None):
                'umfpack_get_symbolic', 'umfpack_get_determinant',
                'umfpack_numeric', 'umfpack_qsymbolic', 'umfpack_report_control',
                'umfpack_report_info', 'umfpack_report_matrix',
-               'umfpack_report_numeric', 'umfpack_report_perm',
+               'umfpack_report_numeric',
+               'umfpack_report_perm',
                'umfpack_report_status', 'umfpack_report_symbolic',
                'umfpack_report_triplet', 'umfpack_report_vector',
                'umfpack_solve', 'umfpack_symbolic', 'umfpack_transpose',
@@ -338,8 +376,7 @@ def configuration(parent_package='', top_path=None):
         r'umf_[dz][il]_triplet_nomap_x': ['DO_VALUES'],
         r'umf_[dz][il]_assemble_fixq': ['FIXQ'],
         r'umf_[dz][il]_store_lu_drop': ['DROP'],
-        r'umfpack_di_wsolve': ['WSOLVE'],
-        
+        r'umfpack_[dz][il]_wsolve': ['WSOLVE'],
     }
 
     do_copy = False
@@ -347,7 +384,7 @@ def configuration(parent_package='', top_path=None):
                          ('dl', ['DLONG']),
                          ('zi', ['ZINT']),
                          ('zl', ['ZLONG'])]:
-        for f0 in UMF + UMFUSER: 
+        for f0 in UMF + UMFUSER:  # TODO: UMFUSER targets not building!
             f = tmp / f'UMFPACK{type_.upper()}/Source/{f0}.c'
             if f0.startswith('umf_'):
                 fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
@@ -356,7 +393,7 @@ def configuration(parent_package='', top_path=None):
             # convert targets to correct source files names:
             if 'hsolve' in fnew.name:
                 f = f.parent / f.name.replace('hsolve', 'tsolve')
-            elif 'triplet' in fnew.name:
+            elif 'umf_triplet' in f0:
                 f = f.parent / 'umf_triplet.c'
                 do_copy = True
             elif 'assemble' in fnew.name:
@@ -368,7 +405,7 @@ def configuration(parent_package='', top_path=None):
             elif 'wsolve':
                 f = f.parent / 'umfpack_solve.c'
                 do_copy = True
-            umfpack_sources.append(str(fnew))
+            umfpack_sources.append(str(fnew.relative_to(SS.parent)))
             if not do_copy:
                 shutil.move(f, fnew)
             else:
@@ -389,29 +426,29 @@ def configuration(parent_package='', top_path=None):
     GENERIC = ['umfpack_timer', 'umfpack_tictoc']
     for f0 in GENERIC:
         f = SS / f'UMFPACK/Source/{f0}.c'
-        umfpack_sources.append(str(f))
+        umfpack_sources.append(str(f.relative_to(SS.parent)))
             
     # UMFPACK
     config.add_library(
         'umfpack',
         sources=umfpack_sources,
         include_dirs=[
-            str(tmp / 'UMFPACKI/Source'),
-            str(tmp / 'UMFPACKL/Source'),
-            str(tmp / 'UMFPACKDI/Source'),
-            str(tmp / 'UMFPACKDL/Source'),
-            str(tmp / 'UMFPACKZI/Source'),
-            str(tmp / 'UMFPACKZL/Source'),
+            str((tmp / 'UMFPACKI/Source').relative_to(SS.parent)),
+            str((tmp / 'UMFPACKL/Source').relative_to(SS.parent)),
+            str((tmp / 'UMFPACKDI/Source').relative_to(SS.parent)),
+            str((tmp / 'UMFPACKDL/Source').relative_to(SS.parent)),
+            str((tmp / 'UMFPACKZI/Source').relative_to(SS.parent)),
+            str((tmp / 'UMFPACKZL/Source').relative_to(SS.parent)),
             
-            str(SS / 'UMFPACK/Include'),
-            str(SS / 'UMFPACK/Source'),
-            str(SS / 'AMD/Include'),
-            str(SS / 'SuiteSparse_config'),
-            str(SS / 'CHOLMOD/Include'),
+            str((SS / 'UMFPACK/Include').relative_to(SS.parent)),
+            str((SS / 'UMFPACK/Source').relative_to(SS.parent)),
+            str((SS / 'AMD/Include').relative_to(SS.parent)),
+            str((SS / 'SuiteSparse_config').relative_to(SS.parent)),
+            str((SS / 'CHOLMOD/Include').relative_to(SS.parent)),
         ],
         libraries=['amd', 'cholmod', 'suitesparseconfig', 'lapack', 'blas'],
         language='c')
-    
+
     return config
 
 
