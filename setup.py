@@ -4,6 +4,7 @@ import logging
 import pathlib
 import shutil
 from typing import List, Tuple
+import re
 logging.basicConfig()
 logger = logging.getLogger('suitesparse-setup')
 SS = pathlib.Path(__file__).parent / 'SuiteSparse'
@@ -236,6 +237,180 @@ def configuration(parent_package='', top_path=None):
         include_dirs=[str(SS / 'SuiteSparse_config')] + cholmod_includes,
         libraries=['amd', 'colamd', 'suitesparseconfig', 'lapack', 'blas'],
         language='c')    
+
+    # SPQR
+    config.add_library(
+        'spqr',
+        sources=[str(f) for f in (SS / 'SPQR/Source').glob('*.cpp')],
+        include_dirs=[str(SS / 'SPQR/Include'), str(SS / 'CHOLMOD/Include'), str(SS / 'SuiteSparse_config')],
+        libraries=['amd', 'colamd', 'cholmod', 'suitesparseconfig', 'lapack', 'blas'],
+        language='c')
+
+    shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKI/Source')
+    shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKL/Source')
+    shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKDI/Source')
+    shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKDL/Source')
+    shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKZI/Source')
+    shutil.copytree(SS / 'UMFPACK/Source', tmp / 'UMFPACKZL/Source')
+    umf_hdrs = {}
+    for type_, macros in [('i', ['DINT']),
+                          ('l', ['DLONG']),
+                          ('di', ['DINT']),
+                          ('dl', ['DLONG']),
+                          ('zi', ['ZINT']),
+                          ('zl', ['ZLONG'])]:
+        umf_hdrs[type_]= ([(f.name, f.name.replace('umf_', f'umf_{type_}_'))
+                           for f in (SS / 'UMFPACK/Source').glob('umf_*.h')] +
+                          [(f.name, f.name.replace('umfpack_', f'umfpack_{type_}_'))
+                           for f in (SS / 'UMFPACK/Source').glob('umfpack_*.h')])
+        for f in (tmp / f'UMFPACK{type_.upper()}/Source/').glob('umf_*.h'):
+            fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=macros)
+            _redirect_headers(f=fnew, headers=umf_hdrs[type_])
+
+    # non-user-callable umf_*.[ch] files, int/SuiteSparse_long versions only
+    # (no real/complex):
+    UMFINT = ['umf_analyze', 'umf_apply_order', 'umf_colamd', 'umf_free',
+              'umf_fsize', 'umf_is_permutation', 'umf_malloc', 'umf_realloc',
+              'umf_report_perm', 'umf_singletons', 'umf_cholmod']
+    umfpack_sources = []
+    for type_, macro in [('i', 'DINT'), ('l', 'DLONG')]:
+        for f0 in UMFINT:
+            f = tmp / f'UMFPACK{type_.upper()}/Source/{f0}.c'
+            fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
+            umfpack_sources.append(str(fnew))
+            shutil.move(f, fnew)
+            _add_macros(f=fnew, macros=[macro])
+            _redirect_headers(f=fnew, headers=umf_hdrs[type_])
+        
+    # non-user-callable, created from umf_ltsolve.c, umf_utsolve.c,
+    # umf_triplet.c, and umf_assemble.c , with int/SuiteSparse_long
+    # and real/complex versions:
+    UMF_CREATED = ['umf_lhsolve', 'umf_uhsolve', 'umf_triplet_map_nox',
+                   'umf_triplet_nomap_x', 'umf_triplet_nomap_nox',
+                   'umf_triplet_map_x', 'umf_assemble_fixq',
+                   'umf_store_lu_drop']
+
+    # non-user-callable umf_*.[ch] files:
+    UMFCH = ['umf_assemble', 'umf_blas3_update', 'umf_build_tuples',
+             'umf_create_element', 'umf_dump', 'umf_extend_front',
+             'umf_garbage_collection', 'umf_get_memory', 'umf_init_front',
+             'umf_kernel', 'umf_kernel_init', 'umf_kernel_wrapup',
+             'umf_local_search', 'umf_lsolve', 'umf_ltsolve',
+             'umf_mem_alloc_element', 'umf_mem_alloc_head_block',
+             'umf_mem_alloc_tail_block', 'umf_mem_free_tail_block',
+             'umf_mem_init_memoryspace', 'umf_report_vector', 'umf_row_search',
+             'umf_scale_column', 'umf_set_stats', 'umf_solve',
+             'umf_symbolic_usage', 'umf_transpose', 'umf_tuple_lengths',
+             'umf_usolve', 'umf_utsolve', 'umf_valid_numeric',
+             'umf_valid_symbolic', 'umf_grow_front', 'umf_start_front',
+	     'umf_store_lu', 'umf_scale']
+    
+    # non-user-callable, int/SuiteSparse_long and real/complex versions:
+    UMF = UMF_CREATED + UMFCH
+
+    # user-callable umfpack_*.[ch] files (int/SuiteSparse_long and real/complex):
+    UMFPACK = ['umfpack_col_to_triplet', 'umfpack_defaults',
+               'umfpack_free_numeric', 'umfpack_free_symbolic',
+               'umfpack_get_numeric', 'umfpack_get_lunz',
+               'umfpack_get_symbolic', 'umfpack_get_determinant',
+               'umfpack_numeric', 'umfpack_qsymbolic', 'umfpack_report_control',
+               'umfpack_report_info', 'umfpack_report_matrix',
+               'umfpack_report_numeric', 'umfpack_report_perm',
+               'umfpack_report_status', 'umfpack_report_symbolic',
+               'umfpack_report_triplet', 'umfpack_report_vector',
+               'umfpack_solve', 'umfpack_symbolic', 'umfpack_transpose',
+               'umfpack_triplet_to_col', 'umfpack_scale',
+               'umfpack_load_numeric', 'umfpack_save_numeric',
+               'umfpack_load_symbolic', 'umfpack_save_symbolic']
+    
+    # user-callable, created from umfpack_solve.c (umfpack_wsolve.h exists, though):
+    # with int/SuiteSparse_long and real/complex versions:
+    UMFPACKW = ['umfpack_wsolve']
+
+    UMFUSER = UMFPACKW + UMFPACK
+
+    _special_macros = {
+        r'umf_[dz][il]_\whsolve': ['CONJUGATE_SOLVE'],
+        r'umf_[dz][il]_triplet_map_x': ['DO_MAP', 'DO_VALUES'],
+        r'umf_[dz][il]_triplet_map_nox': ['DO_MAP'],
+        r'umf_[dz][il]_triplet_nomap_x': ['DO_VALUES'],
+        r'umf_[dz][il]_assemble_fixq': ['FIXQ'],
+        r'umf_[dz][il]_store_lu_drop': ['DROP'],
+        r'umfpack_di_wsolve': ['WSOLVE'],
+        
+    }
+
+    do_copy = False
+    for type_, macro in [('di', ['DINT']),
+                         ('dl', ['DLONG']),
+                         ('zi', ['ZINT']),
+                         ('zl', ['ZLONG'])]:
+        for f0 in UMF + UMFUSER: 
+            f = tmp / f'UMFPACK{type_.upper()}/Source/{f0}.c'
+            if f0.startswith('umf_'):
+                fnew = f.parent / f.name.replace('umf_', f'umf_{type_}_')
+            else:
+                fnew = f.parent / f.name.replace('umfpack_', f'umfpack_{type_}_')
+            # convert targets to correct source files names:
+            if 'hsolve' in fnew.name:
+                f = f.parent / f.name.replace('hsolve', 'tsolve')
+            elif 'triplet' in fnew.name:
+                f = f.parent / 'umf_triplet.c'
+                do_copy = True
+            elif 'assemble' in fnew.name:
+                f = f.parent / 'umf_assemble.c'
+                do_copy = True
+            elif 'store_lu' in fnew.name:
+                f = f.parent / 'umf_store_lu.c'
+                do_copy = True
+            elif 'wsolve':
+                f = f.parent / 'umfpack_solve.c'
+                do_copy = True
+            umfpack_sources.append(str(fnew))
+            if not do_copy:
+                shutil.move(f, fnew)
+            else:
+                shutil.copyfile(f, fnew)
+                do_copy = False
+            # Do any extra macros apply to this file?
+            extra_macros = []
+            for regex in _special_macros:
+                match = re.search(regex, fnew.name)
+                if match:
+                    extra_macros += _special_macros[regex]
+                break
+            _add_macros(f=fnew, macros=macro + extra_macros)
+            _redirect_headers(f=fnew, headers=umf_hdrs[type_])
+
+    # user-callable, only one version for int/SuiteSparse_long,
+    # real/complex, *.[ch] files:
+    GENERIC = ['umfpack_timer', 'umfpack_tictoc']
+    for f0 in GENERIC:
+        f = SS / f'UMFPACK/Source/{f0}.c'
+        umfpack_sources.append(str(f))
+            
+    # UMFPACK
+    config.add_library(
+        'umfpack',
+        sources=umfpack_sources,
+        include_dirs=[
+            str(tmp / 'UMFPACKI/Source'),
+            str(tmp / 'UMFPACKL/Source'),
+            str(tmp / 'UMFPACKDI/Source'),
+            str(tmp / 'UMFPACKDL/Source'),
+            str(tmp / 'UMFPACKZI/Source'),
+            str(tmp / 'UMFPACKZL/Source'),
+            
+            str(SS / 'UMFPACK/Include'),
+            str(SS / 'UMFPACK/Source'),
+            str(SS / 'AMD/Include'),
+            str(SS / 'SuiteSparse_config'),
+            str(SS / 'CHOLMOD/Include'),
+        ],
+        libraries=['amd', 'cholmod', 'suitesparseconfig', 'lapack', 'blas'],
+        language='c')
     
     return config
 
